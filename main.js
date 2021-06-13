@@ -8,46 +8,23 @@ function prepTote(url) {
         toteForm.requestSubmit()
 
     }
-    function addItemToTote() {
-
-    }
-    function isEnoughInventory(quantity) {
-        const currentQuantity =() => {
-
-        }
-
-        return currentQuantity > quantity
-    }
-    function changeLinkToASIN(url, quantity) {
-        chrome.storage.sync.set({"quantity": quantity})
-        document.location.url = url
-    }
-
-   
-
     function addMissingItem() {
-        const skippedItem = document.getElementsByClassName('item-status--skipped')[0]
-        if (skippedItem) {
-            const asinElement = skippedItem.querySelectorAll('a.a-link-normal')[1]
-            const asin = asinElement.innerText
-            const link = asinElement.href
-            const pickListQuantity = parseInt(skippedItem.querySelectorAll('td')[4].innerText)
-            const packedQuantity = parseInt(skippedItem.querySelectorAll('td')[5].innerText)
-            const quantityMissing = pickListQuantity - packedQuantity
+        const skippedElements = document.getElementsByClassName('item-status--skipped')
+        if (skippedElements) {
+            const firstSkipped = skippedElements[0]
+            const skippedAsin = firstSkipped.getElementsByTagName('td')[1].getElementsByTagName('a').innerText
+            const input = document.getElementsByName('asin_or_upc')
+            const asinForm = document.querySelector("form[action='/picklist/pack_product']")
 
-            if (quantityMissing > 0) {
-                if (isEnoughInventory(quantityMissing)) {
-                    changeLinkToASIN(quantityMissing)
-                    addItemToTote(link)
-                } else {
-                    addItemToTote(link)
-                }
-            }
-
+            input.value = skippedAsin
+            asinForm.requestSubmit()
+        } else {
+            chrome.tabs.onUpdated.removeListener(onUpdateListener)
         }
     }
-    const isTotePage = url => url.match('')
-    const isInventoryPage = url => url.match('view_inventory_for_asin_display')
+
+    const isTotePage = url => url.includes('view_pack_by_picklist')
+    const isUnknownLocationPage = url => url.includes('pack_from_unknown_location')
 
     const toteForm = document.querySelector("form[action='/picklist_change_tote/set_tote']")
     const asinForm = document.querySelector("form[action='/picklist/pack_product']")
@@ -58,19 +35,17 @@ function prepTote(url) {
         } else if (asinForm) {
             addMissingItem()
         }
-    } else if (isInventoryPage(url)){
-        
+    } else if (isUnknownLocationPage(url)) {
+        const selectElement = document.getElementById('location_')
+        const location = selectElement.getElementsByTagName('option')[selectElement.getElementsByTagName('option').length - 1].value
+        selectElement.value = location
+
     }
 
 
 }
 function onClickHandler() {
-    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-        if (changeInfo.status === 'complete' && tab.active) {
-            console.dir(tab)
-            prepTote(url)
-        }
-    })
+    chrome.tabs.onUpdated.addListener(onUpdateListener)
 }
 chrome.contextMenus.onClicked.addListener(onClickHandler)
 
@@ -81,3 +56,11 @@ chrome.runtime.onInstalled.addListener(function() {
         "id": "prep_tote"
      })
 })
+
+const onUpdateListener = (tabId, changeInfo, tab) => {
+        if (changeInfo.status === 'complete' && tab.active) {
+            const url = tab.url
+            prepTote(url)
+        }
+    }
+    
